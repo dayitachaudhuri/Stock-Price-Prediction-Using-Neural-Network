@@ -1,14 +1,15 @@
-import math # Mathematical functions
-import numpy as np # Fundamental package for scientific computing with Python
-import pandas as pd # For analysing and manipulating data
-from datetime import date, timedelta # Date Functions
-from pandas.plotting import register_matplotlib_converters # Adds plotting functions for calender dates
-import matplotlib.pyplot as plt # For visualization
-import matplotlib.dates as mdates # Formatting dates
-from sklearn.metrics import mean_absolute_error, mean_squared_error # For measuring model performance / errors
-from sklearn.preprocessing import MinMaxScaler #to normalize the price data
-from keras.models import Sequential # Deep learning library, used for neural networks
-from keras.layers import LSTM, Dense # Deep learning classes for recurrent and regular densely-connected layers
+import math
+import numpy as np
+import pandas as pd 
+from datetime import date, timedelta
+from pandas.plotting import register_matplotlib_converters
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.preprocessing import MinMaxScaler
+from keras.models import Sequential
+from keras.layers import LSTM, Dense 
+import yfinance as yf
 
 today = date.today()
 date_today = today.strftime("%Y-%m-%d")
@@ -19,15 +20,8 @@ stock = input("Enter stock name:")
 stockname = stock
 symbol = '^GSPC'
 
-# You can either use webreader or yfinance to load the data from yahoo finance
-# import pandas_datareader as webreader
-# df = webreader.DataReader(symbol, start=date_start, end=date_today, data_source="yahoo")
-
-import yfinance as yf #Alternative package if webreader does not work: pip install yfinance
 df = yf.download(symbol, start=date_start, end=date_today)
 
-# Taking a look at the shape of the dataset
-print(df.shape)
 df.head(5)
 
 register_matplotlib_converters()
@@ -46,10 +40,10 @@ plt.show()
 train_df = df.filter(['Close'])
 data_unscaled = train_df.values
 
-# Get the number of rows to train the model on 80% of the data
+# Number of rows to train the model on 80% of the data
 train_data_length = math.ceil(len(data_unscaled) * 0.8)
 
-# Transform features by scaling each feature to a range between 0 and 1
+# Transforming features by scaling each feature to a range between 0 and 1
 mmscaler = MinMaxScaler(feature_range=(0, 1))
 np_data = mmscaler.fit_transform(data_unscaled)
 
@@ -58,41 +52,36 @@ sequence_length = 50
 # Prediction Index
 index_Close = train_df.columns.get_loc("Close")
 print(index_Close)
-# Split the training data into train and train data sets
-# As a first step, we get the number of rows to train the model on 80% of the data
+
+# Splitting the training data into train and train data sets in 80% Training ratio
 train_data_len = math.ceil(np_data.shape[0] * 0.8)
 
-# Create the training and test data
 train_data = np_data[0:train_data_len, :]
 test_data = np_data[train_data_len - sequence_length:, :]
 
-
-# The RNN needs data with the format of [samples, time steps, features]
-# Here, we create N samples, sequence_length time steps per sample, and 6 features
+# Creating N samples, sequence_length time steps per sample, and 6 features
 def partition_dataset(sequence_length, train_df):
     x, y = [], []
     data_len = train_df.shape[0]
     for i in range(sequence_length, data_len):
-        x.append(train_df[i - sequence_length:i, :])  # contains sequence_length values 0-sequence_length * columsn
+        x.append(train_df[i - sequence_length:i, :]) 
         y.append(train_df[
-                     i, index_Close])  # contains the prediction values for validation (3rd column = Close),  for single-step prediction
+                     i, index_Close]) 
 
-    # Convert the x and y to numpy arrays
+    # Converting the x and y to numpy arrays
     x = np.array(x)
     y = np.array(y)
     return x, y
 
 
-# Generate training data and test data
+# Generating training data and test data
 x_train, y_train = partition_dataset(sequence_length, train_data)
 x_test, y_test = partition_dataset(sequence_length, test_data)
 
-# Print the shapes: the result is: (rows, training_sequence, features) (prediction value, )
 print(x_train.shape, y_train.shape)
 print(x_test.shape, y_test.shape)
 
-# Validate that the prediction value and the input match up
-# The last close price of the second input sample should equal the first prediction value
+# Validating that the prediction value and the input match up
 print(x_test[1][sequence_length - 1][index_Close])
 print(y_test[0])
 
@@ -108,7 +97,7 @@ model.add(LSTM(neurons, return_sequences=False))
 model.add(Dense(8, activation='relu'))
 model.add(Dense(1))
 
-# Compile the model
+# Compiling the model
 model.compile(optimizer='adam', loss='mean_squared_error')
 
 model.fit(x_train, y_train, batch_size=16, epochs=8)
@@ -135,7 +124,7 @@ print(f'Median Absolute Percentage Error (MDAPE): {np.round(MDAPE, 2)} %')
 # The date from which on the date is displayed
 display_start_date = "2019-01-01"
 
-# Add the difference between the valid and predicted prices
+# Adding the difference between the valid and predicted prices
 train = train_df[:train_data_length + 1]
 valid = train_df[train_data_length:]
 valid.insert(1, "Predictions", y_pred, True)
@@ -154,11 +143,6 @@ plt.plot(train["Close"], color="#039dfc", linewidth=1.0)
 plt.plot(valid["Predictions"], color="#E91D9E", linewidth=1.0)
 plt.plot(valid["Close"], color="black", linewidth=1.0)
 plt.legend(["Train", "Test Predictions", "Ground Truth"], loc="upper left")
-
-# Fill between plotlines
-# ax.fill_between(yt.index, 0, yt["Close"], color="#b9e1fa")
-# ax.fill_between(yv.index, 0, yv["Predictions"], color="#F0845C")
-# ax.fill_between(yv.index, yv["Close"], yv["Predictions"], color="grey")
 
 # Create the bar plot with the differences
 valid.loc[valid["Difference"] >= 0, 'diff_color'] = "#2BC97A"
